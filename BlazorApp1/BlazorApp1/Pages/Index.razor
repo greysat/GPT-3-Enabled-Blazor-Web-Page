@@ -1,0 +1,71 @@
+﻿@page "/"
+
+<PageTitle>ChatGPT</PageTitle>
+
+<h1>ChatGPT</h1>
+
+<input @bind="message"></input>
+
+<button @onclick="GenerateResponse">Send</button>
+
+<h3>ChatGPT Response:</h3>
+<p style="width: 400px; padding: 30px; background-color: #ccc; margin-top: 20px;">@response</p>
+
+
+@using System.Net.Http;
+@using Newtonsoft.Json;
+@using System.Text;
+@using System.Net.Http.Headers;
+@inject HttpClient Http;
+
+@code {
+    string message = "";
+    string? response = "";
+
+    public class Choice
+    {
+        public string? text { get; set; } // 'text' is now nullable
+    }
+
+    public class OpenAIResponse
+    {
+        public List<Choice>? choices { get; set; } 
+    }
+
+    private async Task GenerateResponse()
+    {
+        var apiKey = "";
+        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        var jsonContent = new
+        {
+            messages = new List<object>
+            {
+                new { role = "system", content = "You are a helpful assistant."},
+                new { role = "user", content = message }
+            },
+            model = "text-turbo-003",
+            max_tokens = 1000
+        };
+
+        var httpResponse = await Http.PostAsync("https://api.openai.com/v1/completions", new StringContent(JsonConvert.SerializeObject(jsonContent), Encoding.UTF8, "application/json"));
+
+        if (httpResponse.IsSuccessStatusCode)
+        {
+            var resContent = await httpResponse.Content.ReadAsStringAsync();
+            var data = JsonConvert.DeserializeObject<OpenAIResponse>(resContent);
+            if (data.choices != null && data.choices.Count > 0 && data.choices[0] != null)
+            {
+                response = data.choices[0].text ?? "No generated text found.";
+            }
+            else
+            {
+                response = "No generated text found.";
+            }
+        }
+        else
+        {
+            response = "Error: " + httpResponse.StatusCode;
+        }
+    }
+}
